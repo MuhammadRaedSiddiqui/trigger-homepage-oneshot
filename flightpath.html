@@ -1,0 +1,1928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Trigger — your business on autopilot. Follow one lead, unbroken, from first contact to closed deal. No human ever touches it.">
+<title>Trigger — Your business on autopilot</title>
+
+<!-- Fonts: Instrument Serif (display) + Instrument Sans (body). Same foundry.
+     This replaces v4's Satoshi request, which never loaded (Fontshare-only). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   TRIGGER — "Flight Path" homepage
+   The page IS the pipeline: one signal wire threads four nodes,
+   a scroll-linked pulse rides it from Inquiry to Close.
+   ------------------------------------------------------------
+   A2  design tokens + reset      (pending)
+   A3  instrument-grid backdrop   (pending)
+   B*  sections                   (pending)
+   C*  spine geometry + pulse     (pending)
+   ============================================================ */
+
+/* --- A2 · design tokens ------------------------------------- */
+:root {
+  /* Surfaces — cockpit-glass indigo-black, not neutral black */
+  --ink:        oklch(9%  0.025 258);   /* page ground */
+  --ink-raised: oklch(15% 0.025 258);   /* glass panels, cards */
+  --ink-glass:  oklch(18% 0.028 258);   /* lifted / hover panels */
+  --ink-line:   oklch(26% 0.02  258);   /* hairline borders + dividers */
+
+  /* Text — tertiary is the FLOOR; never darker (WCAG AA on --ink) */
+  --text-primary:   oklch(96% 0.006 90);   /* headings, primary copy */
+  --text-secondary: oklch(72% 0.02  258);  /* body, subheads */
+  --text-tertiary:  oklch(64% 0.025 258);  /* labels, captions, readouts */
+
+  /* Accents — one go-color, one caution. Violet retired. */
+  --accent:      oklch(74% 0.15 168);          /* lit wire, active nodes, go */
+  --accent-dim:  oklch(38% 0.09 168);          /* large fills only */
+  --accent-glow: oklch(80% 0.13 168 / 0.45);   /* halos */
+  --caution:     oklch(78% 0.13 65);           /* in-progress segment, PENDING */
+  --caution-glow:oklch(82% 0.12 65 / 0.40);
+  --alert:       oklch(64% 0.20 25);           /* genuine alerts only */
+
+  /* Type */
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-body:    'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:    'SFMono-Regular', 'SF Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* Motion */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --shell: min(1400px, 92vw);
+}
+
+/* --- A2 · reset --------------------------------------------- */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { font-size: 16px; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; color-scheme: dark; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  font-family: var(--font-body);
+  background: var(--ink);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+img, svg { display: block; max-width: 100%; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+
+/* Instrument-style focus ring — native cursor kept, no custom cursor */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* Tabular numerals wherever digits must not jitter */
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Tracked uppercase micro-label */
+.microlabel {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* --- A3 · instrument-grid backdrop (replaces particle canvas) --
+   Fixed, full-viewport, purely decorative. Three cheap layers:
+   an etched grid, a faint centre glow, and edge vignette.
+   No canvas, no rAF — near-zero cost on low-power devices.       */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    /* faint instrument-green wash toward the top where the signal enters */
+    radial-gradient(ellipse 80% 55% at 50% -5%,
+      color-mix(in oklch, var(--accent) 9%, transparent), transparent 70%),
+    /* etched grid — hairlines every 64px */
+    repeating-linear-gradient(to right,
+      var(--ink-line) 0 1px, transparent 1px 64px),
+    repeating-linear-gradient(to bottom,
+      var(--ink-line) 0 1px, transparent 1px 64px),
+    var(--ink);
+  /* keep grid whisper-faint; the radial + vignette sit at full strength */
+  background-blend-mode: normal, soft-light, soft-light, normal;
+}
+
+/* corner vignette so the grid fades at the edges, never a hard tile */
+.backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 120% 120% at 50% 45%,
+    transparent 55%, var(--ink) 100%);
+}
+
+/* --- B1 · nav ---------------------------------------------- */
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px clamp(20px, 4vw, 48px);
+  /* glass so the hero reads through it once you scroll */
+  background: color-mix(in oklch, var(--ink) 70%, transparent);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  border-bottom: 1px solid transparent;
+  transition: border-color 300ms ease, background 300ms ease;
+}
+.nav.is-scrolled { border-bottom-color: var(--ink-line); }
+
+.nav-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+}
+/* ringed signal-node mark — the pipeline origin, in miniature */
+.nav-logo-mark {
+  position: relative;
+  width: 22px; height: 22px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in oklch, var(--accent) 55%, var(--ink-line));
+}
+.nav-logo-mark::before {
+  content: '';
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 9px var(--accent-glow);
+}
+.nav-logo-word {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.nav-cta {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 10px 22px;
+  border: 1px solid var(--ink-line);
+  border-radius: 100px;
+  color: var(--text-primary);
+  transition: background 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+.nav-cta:hover { background: var(--text-primary); color: var(--ink); border-color: var(--text-primary); }
+
+/* --- B2 · hero shell --------------------------------------- */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 140px clamp(20px, 4vw, 48px) 96px;
+  max-width: var(--shell);
+  margin: 0 auto;
+  width: 100%;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  opacity: 0;
+  animation: fadeUp 700ms var(--ease-out-expo) 200ms forwards;
+}
+.hero-eyebrow::before {
+  content: '';
+  width: 26px; height: 1px;
+  background: var(--accent);
+}
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(3rem, 11vw, 9.5rem);
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+.hero h1 .line { display: block; overflow: hidden; }
+.hero h1 .line-inner {
+  display: block;
+  transform: translateY(110%);
+  animation: revealLine 1100ms var(--ease-out-expo) forwards;
+}
+.hero h1 .line:nth-child(2) .line-inner { animation-delay: 130ms; }
+.hero h1 em { font-style: italic; color: var(--accent); }
+
+.hero-sub {
+  margin-top: 34px;
+  max-width: 46ch;
+  font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  opacity: 0;
+  animation: fadeUp 800ms var(--ease-out-expo) 640ms forwards;
+}
+.hero-sub b { color: var(--text-primary); font-weight: 600; }
+
+.hero-cta {
+  margin-top: 44px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  opacity: 0;
+  animation: fadeUp 800ms var(--ease-out-expo) 820ms forwards;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  padding: 16px 32px;
+  background: var(--accent);
+  color: var(--ink);
+  border-radius: 100px;
+  font-weight: 700;
+  font-size: 1rem;
+  position: relative;
+  transition: transform 220ms var(--ease-out-expo), box-shadow 220ms ease;
+  box-shadow: 0 0 0 0 var(--accent-glow);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 40px -8px var(--accent-glow);
+}
+.btn-primary svg { transition: transform 220ms var(--ease-out-expo); }
+.btn-primary:hover svg { transform: translate(3px, -3px); }
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: color 200ms ease, gap 200ms ease;
+}
+.btn-ghost:hover { color: var(--text-primary); gap: 13px; }
+.btn-ghost svg { color: var(--accent); }
+
+@keyframes revealLine { to { transform: translateY(0); } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+
+/* --- B3 · hero HUD (mission clock, engaged light, horizon) --- */
+.hero-hud {
+  position: absolute;
+  top: clamp(96px, 14vh, 150px);
+  right: clamp(20px, 4vw, 48px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  text-align: right;
+  opacity: 0;
+  animation: fadeUp 800ms var(--ease-out-expo) 1000ms forwards;
+}
+
+.hud-engaged {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.hud-engaged::before {
+  content: '';
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+  animation: enginePulse 2.4s ease-in-out infinite;
+}
+@keyframes enginePulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.82); }
+  50%      { opacity: 1;   transform: scale(1); }
+}
+
+.hud-clock {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+}
+
+/* Self-leveling artificial-horizon hairline in the hero's lower third.
+   Banks slightly on load, then settles level — the system stabilizing. */
+.hero-horizon {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: clamp(120px, 22vh, 220px);
+  height: 1px;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  transform: rotate(-4deg);
+  animation: horizonLevel 2200ms var(--ease-out-expo) 400ms forwards;
+}
+.hero-horizon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right,
+    transparent, color-mix(in oklch, var(--accent) 45%, transparent) 50%, transparent);
+}
+/* fixed aircraft-reference bracket dead-centre */
+.hero-horizon::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 46px; height: 10px;
+  transform: translate(-50%, -50%);
+  border: 1px solid color-mix(in oklch, var(--accent) 60%, transparent);
+  border-top: none;
+  border-radius: 0 0 3px 3px;
+}
+@keyframes horizonLevel {
+  0%   { transform: rotate(-4deg); }
+  70%  { transform: rotate(1.2deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* only the infinite idle throb is suppressed; reveals + self-level still play */
+  .hud-engaged::before { animation: none; opacity: 1; }
+}
+
+@media (max-width: 640px) {
+  .hero-hud { position: static; align-items: flex-start; text-align: left; margin-bottom: 28px; }
+  .hero-horizon { display: none; }
+}
+
+/* --- B4 · reusable node marker (used by nodes 0–4) ----------
+   A ringed dot the pulse "seats" into. Default = dim/armed;
+   C2 adds .is-lit when the scroll pulse arrives.              */
+.node-marker {
+  --nm: 18px;                       /* dot diameter */
+  position: relative;
+  width: var(--nm); height: var(--nm);
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--ink-glass);
+  border: 1px solid var(--ink-line);
+  transition: background 500ms var(--ease-out-expo),
+              border-color 500ms var(--ease-out-expo),
+              box-shadow 500ms var(--ease-out-expo);
+}
+/* the armed inner core */
+.node-marker::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  opacity: 0.5;
+  transition: background 500ms ease, opacity 500ms ease, box-shadow 500ms ease;
+}
+/* concentric ring that pulses only while lit */
+.node-marker::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+.node-marker.is-lit {
+  background: color-mix(in oklch, var(--accent) 22%, var(--ink-raised));
+  border-color: var(--accent);
+  box-shadow: 0 0 22px -2px var(--accent-glow);
+}
+.node-marker.is-lit::before {
+  background: var(--accent);
+  opacity: 1;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+.node-marker.is-lit::after { opacity: 0.6; animation: nodeRing 2.6s ease-out infinite; }
+@keyframes nodeRing {
+  0%   { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* --- B4 · origin node (01 · Inquiry) at hero foot ----------- */
+.origin {
+  margin-top: clamp(56px, 9vh, 104px);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  opacity: 0;
+  animation: fadeUp 800ms var(--ease-out-expo) 1150ms forwards;
+}
+.origin-label { display: flex; flex-direction: column; gap: 3px; }
+.origin-label .folio {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+.origin-label .folio b { color: var(--text-primary); font-weight: 400; }
+.origin-readout {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+/* the "● acquired" dot flips green once the origin lights */
+.origin-readout::before {
+  content: '';
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-tertiary);
+  transition: background 500ms ease, box-shadow 500ms ease;
+}
+.origin.is-lit .origin-readout::before {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* the origin reveal still plays; only the infinite ring loop stops */
+  .node-marker.is-lit::after { animation: none; }
+}
+
+/* ============================================================
+   B5–B8 · THE LIVING PIPELINE (spine)
+   The centerpiece. One SVG wire (filled by C1) threads four
+   nodes down the page centre. Each node blooms + plays a
+   one-shot proof when the scroll pulse arrives (C2 adds
+   .is-active on the node, which drives [data-proof]).
+   ============================================================ */
+.pipeline {
+  position: relative;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: clamp(60px, 10vh, 120px) clamp(20px, 4vw, 48px) clamp(80px, 12vh, 160px);
+}
+
+/* the global spine SVG — absolutely positioned, spans the section,
+   sits behind the node content. C1 computes its path from node centres. */
+.spine {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: visible;
+}
+.spine-track { fill: none; stroke: var(--ink-line); stroke-width: 2; }
+/* the lit portion (behind the pulse) — C2 animates stroke-dashoffset */
+.spine-lit   { fill: none; stroke: var(--accent); stroke-width: 2;
+               filter: drop-shadow(0 0 6px var(--accent-glow)); }
+/* the travelling pulse bead */
+.spine-pulse { fill: var(--accent); filter: drop-shadow(0 0 8px var(--accent-glow)); }
+
+/* each node is a two-column row: the marker rail + the proof card.
+   Odd/even nodes flip sides so the wire zig-zags gently between them. */
+.node {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(32px, 6vw, 88px);
+  align-items: center;
+  min-height: 62vh;
+}
+.node:nth-child(even) .node-head  { order: 2; }
+.node:nth-child(even) .node-proof { order: 1; }
+
+.node-head { align-self: center; }
+.node-head .node-marker { margin-bottom: 22px; }
+.node-folio {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+}
+.node-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2rem, 3.6vw, 3.1rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+.node-title em { font-style: italic; color: var(--accent); }
+.node-desc {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  max-width: 40ch;
+}
+
+/* proof card — dim/armed until the node goes .is-active */
+.node-proof {
+  position: relative;
+  background: var(--ink-raised);
+  border: 1px solid var(--ink-line);
+  border-radius: 18px;
+  padding: 26px;
+  min-height: 300px;
+  opacity: 0.55;
+  transform: translateY(16px);
+  transition: opacity 600ms var(--ease-out-expo),
+              transform 600ms var(--ease-out-expo),
+              border-color 600ms ease, box-shadow 600ms ease;
+}
+.node.is-active .node-proof {
+  opacity: 1;
+  transform: translateY(0);
+  border-color: color-mix(in oklch, var(--accent) 30%, var(--ink-line));
+  box-shadow: 0 24px 70px -30px var(--accent-glow);
+}
+.proof-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--ink-line);
+}
+.proof-head .microlabel { color: var(--text-tertiary); }
+.proof-stat {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.proof-stat::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-tertiary); transition: background 400ms ease, box-shadow 400ms ease;
+}
+.node.is-active .proof-stat::before { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+
+/* --- B5 · Inquiry proof — chat resolving + typed interaction - */
+.chat-log { display: flex; flex-direction: column; gap: 11px; margin-bottom: 16px; }
+.chat-msg {
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-width: 85%;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 450ms var(--ease-out-expo), transform 450ms var(--ease-out-expo);
+}
+.node.is-active .chat-msg { opacity: 1; transform: none; }
+.node.is-active .chat-msg:nth-child(2) { transition-delay: 500ms; }
+.node.is-active .chat-msg:nth-child(3) { transition-delay: 1050ms; }
+.chat-in {
+  align-self: flex-start;
+  background: color-mix(in oklch, var(--accent) 14%, var(--ink-glass));
+  border: 1px solid color-mix(in oklch, var(--accent) 22%, transparent);
+  border-bottom-left-radius: 4px;
+  color: var(--text-primary);
+}
+.chat-out {
+  align-self: flex-end;
+  background: var(--ink-glass);
+  border: 1px solid var(--ink-line);
+  border-bottom-right-radius: 4px;
+  color: var(--text-secondary);
+}
+
+/* the scoped hands-on graft: type a question, watch it resolve */
+.chat-try { display: flex; gap: 8px; margin-top: 4px; }
+.chat-try input {
+  flex: 1;
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 11px 14px;
+  color: var(--text-primary);
+  background: var(--ink-glass);
+  border: 1px solid var(--ink-line);
+  border-radius: 10px;
+  transition: border-color 200ms ease;
+}
+.chat-try input::placeholder { color: var(--text-tertiary); }
+.chat-try input:focus { outline: none; border-color: var(--accent); }
+.chat-try button {
+  padding: 0 16px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: transform 180ms var(--ease-out-expo);
+}
+.chat-try button:hover { transform: translateY(-1px); }
+.chat-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.chat-chip {
+  font-size: 0.78rem;
+  padding: 6px 12px;
+  border-radius: 100px;
+  border: 1px solid var(--ink-line);
+  color: var(--text-tertiary);
+  transition: border-color 180ms ease, color 180ms ease;
+}
+.chat-chip:hover { border-color: var(--accent); color: var(--text-primary); }
+/* streamed reply typed in by JS, char by char */
+.chat-reply { min-height: 0; }
+.chat-reply.streaming { border-right: 2px solid var(--accent); }
+
+/* --- B6 · Qualify proof — criteria ticking + fit score ------ */
+.qualify-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+.crit {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px;
+  border-radius: 11px;
+  background: var(--ink-glass);
+  border: 1px solid var(--ink-line);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  transition: opacity 400ms ease, border-color 400ms ease, color 400ms ease;
+}
+.crit-check {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-line);
+  display: grid; place-items: center;
+  transition: background 400ms var(--ease-out-expo), border-color 400ms ease;
+}
+.crit-check svg { width: 12px; height: 12px; stroke: var(--ink); stroke-width: 3;
+  stroke-dasharray: 20; stroke-dashoffset: 20; transition: stroke-dashoffset 400ms var(--ease-out-expo) 100ms; }
+.crit.met {
+  opacity: 1;
+  border-color: color-mix(in oklch, var(--accent) 30%, var(--ink-line));
+  color: var(--text-primary);
+}
+.crit.met .crit-check { background: var(--accent); border-color: var(--accent); }
+.crit.met .crit-check svg { stroke-dashoffset: 0; }
+
+.qualify-score {
+  display: flex; align-items: baseline; gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ink-line);
+}
+.qualify-score .score-num {
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  line-height: 1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.qualify-score .score-label { color: var(--text-tertiary); font-size: 0.82rem; }
+.qualify-verdict {
+  margin-left: auto;
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  padding: 5px 12px;
+  border-radius: 100px;
+  color: var(--text-tertiary);
+  border: 1px solid var(--ink-line);
+  transition: color 400ms ease, border-color 400ms ease, background 400ms ease;
+}
+.node.is-active .qualify-verdict {
+  color: var(--accent);
+  border-color: color-mix(in oklch, var(--accent) 40%, transparent);
+  background: color-mix(in oklch, var(--accent) 12%, transparent);
+}
+
+/* --- B7 · Follow-up proof — sequence auto-sending ----------- */
+.seq { display: flex; flex-direction: column; gap: 0; }
+.seq-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 0;
+}
+/* connecting rail between step icons */
+.seq-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 14px; top: 34px; bottom: -2px;
+  width: 1px;
+  background: var(--ink-line);
+}
+.node.is-active .seq-step:not(:last-child)::after { background: color-mix(in oklch, var(--accent) 45%, var(--ink-line)); }
+.seq-icon {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--ink-line);
+  background: var(--ink-glass);
+  color: var(--text-tertiary);
+  transition: border-color 400ms ease, color 400ms ease, background 400ms ease, box-shadow 400ms ease;
+  position: relative; z-index: 1;
+}
+.seq-icon svg { width: 15px; height: 15px; }
+.seq-body strong { display: block; font-size: 0.92rem; color: var(--text-primary); font-weight: 600; }
+.seq-body span { font-size: 0.82rem; color: var(--text-tertiary); }
+.seq-status {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  padding: 4px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--ink-line);
+  transition: color 400ms ease, border-color 400ms ease, background 400ms ease;
+}
+/* each step flips to "sent" on a stagger once the node is active */
+.seq-step.sent .seq-icon {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 16%, var(--ink-glass));
+  box-shadow: 0 0 14px -2px var(--accent-glow);
+}
+.seq-step.sent .seq-status {
+  color: var(--accent);
+  border-color: color-mix(in oklch, var(--accent) 40%, transparent);
+  background: color-mix(in oklch, var(--accent) 12%, transparent);
+}
+/* pending step shows amber while it's the next to fire */
+.seq-step.pending .seq-status { color: var(--caution); border-color: color-mix(in oklch, var(--caution) 40%, transparent); }
+
+/* --- B8 · Close proof — deal value → WON -------------------- */
+.deal {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 12px 0;
+}
+.deal-value {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(3rem, 6vw, 4.6rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+.deal-value .mono { font-family: var(--font-mono); }
+.deal-meta {
+  display: flex;
+  gap: 26px;
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+}
+.deal-meta b { color: var(--text-secondary); font-weight: 600; }
+/* status chip: PENDING (amber) → WON (green), swapped by C2 */
+.deal-status {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  padding: 10px 26px;
+  border-radius: 100px;
+  border: 1px solid var(--caution);
+  color: var(--caution);
+  transition: color 500ms ease, border-color 500ms ease,
+              background 500ms ease, box-shadow 500ms ease;
+}
+.node.is-active .deal-status {
+  color: var(--ink);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 30px -4px var(--accent-glow);
+}
+/* the destination node marker flares a touch larger */
+.node[data-node="4"] .node-marker { --nm: 22px; }
+
+/* Node responsive collapse — MUST match the JS spine breakpoint (720px):
+   below it the wire goes straight-vertical, so nodes stack single-column
+   with the marker rail on top, keeping wire and markers aligned. */
+@media (max-width: 720px) {
+  .node {
+    grid-template-columns: 1fr;
+    gap: 26px;
+    min-height: 0;
+    margin-bottom: 56px;
+  }
+  .node:nth-child(even) .node-head  { order: 0; }
+  .node:nth-child(even) .node-proof { order: 0; }
+  .node-head .node-marker { margin-bottom: 14px; }
+  .node-proof { min-height: 0; }
+}
+
+/* --- B10 · thesis (kinetic word emphasis, wire through text) - */
+.thesis {
+  position: relative;
+  padding: clamp(120px, 20vh, 220px) clamp(20px, 4vw, 48px);
+  text-align: center;
+  overflow: hidden;
+}
+/* the signal wire continues straight down through the statement */
+.thesis-wire {
+  position: absolute;
+  left: 50%; top: 0; bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--ink-line);
+  pointer-events: none;
+}
+/* the lit fill that grows as the section scrolls through centre */
+.thesis-wire::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  height: var(--thesis-fill, 0%);
+  background: linear-gradient(var(--accent), var(--accent));
+  box-shadow: 0 0 8px var(--accent-glow);
+  transition: height 120ms linear;
+}
+/* the pulse bead that rides the growing fill */
+.thesis-wire::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: var(--thesis-fill, 0%);
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 14px 2px var(--accent-glow);
+  transform: translate(-50%, -50%);
+  opacity: var(--thesis-pulse-op, 0);
+  transition: top 120ms linear;
+}
+
+.thesis-statement {
+  position: relative;
+  z-index: 1;
+  max-width: 18ch;
+  margin: 0 auto;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.2rem, 5.5vw, 4.6rem);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+}
+/* backdrop plate so the wire never crosses letterforms illegibly */
+.thesis-statement {
+  padding: 0 0.4em;
+  background: radial-gradient(ellipse 70% 60% at 50% 50%, var(--ink) 55%, transparent);
+}
+.thesis-statement .word {
+  display: inline-block;
+  color: var(--text-tertiary);
+  opacity: 0.5;
+  transition: color 400ms ease, opacity 400ms ease;
+}
+.thesis-statement .word.lit { color: var(--accent); opacity: 1; }
+.thesis-statement .word.on  { color: var(--text-primary); opacity: 1; }
+
+.thesis-coda {
+  position: relative;
+  z-index: 1;
+  margin-top: 40px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.thesis-coda b { color: var(--accent); font-weight: 400; }
+
+/* thesis wire + word lighting are scroll-driven for everyone (see C2) */
+
+/* ============================================================
+   B9 · TELEMETRY READOUT STRIP
+   The machine's output, in numbers. Odometers count up on entry;
+   "leads processed" ticks in lockstep as the spine pulse advances.
+   ============================================================ */
+.telemetry {
+  border-top: 1px solid var(--ink-line);
+  border-bottom: 1px solid var(--ink-line);
+  background: color-mix(in oklch, var(--ink-raised) 60%, transparent);
+}
+.telemetry-inner {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: clamp(40px, 6vh, 64px) clamp(20px, 4vw, 48px);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: clamp(20px, 3vw, 44px);
+}
+.telemetry-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+.telemetry-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: calc(clamp(20px, 3vw, 44px) / -2);
+  top: 4px; bottom: 4px;
+  width: 1px;
+  background: var(--ink-line);
+}
+.telemetry-value {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.2rem, 3.6vw, 3.2rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: baseline;
+}
+.telemetry-value .unit { font-size: 0.5em; color: var(--accent); margin-left: 2px; }
+.telemetry-label {
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  line-height: 1.3;
+}
+
+@media (max-width: 860px) {
+  .telemetry-inner { grid-template-columns: repeat(2, 1fr); gap: 32px 24px; }
+  .telemetry-item:not(:last-child)::after { display: none; }
+}
+@media (max-width: 420px) {
+  .telemetry-inner { grid-template-columns: 1fr 1fr; }
+}
+
+/* ============================================================
+   B11 · PRE-FLIGHT — "Live in days" built-in-test checklist
+   On scroll into view, items flip amber PENDING → green OK in a
+   staggered cascade (C2 via IntersectionObserver), ending on
+   ALL SYSTEMS GO. Reduced-motion renders the completed state.
+   ============================================================ */
+.preflight {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: clamp(80px, 13vh, 160px) clamp(20px, 4vw, 48px);
+}
+.preflight-head { margin-bottom: clamp(40px, 6vh, 68px); }
+.preflight-head .microlabel { color: var(--accent); margin-bottom: 16px; display: block; }
+.preflight-head h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+.preflight-head h2 em { font-style: italic; color: var(--accent); }
+
+.bit {
+  border: 1px solid var(--ink-line);
+  border-radius: 18px;
+  background: var(--ink-raised);
+  overflow: hidden;
+}
+.bit-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 20px;
+  padding: 22px clamp(20px, 3vw, 32px);
+}
+.bit-row:not(:last-child) { border-bottom: 1px solid var(--ink-line); }
+.bit-label { display: flex; flex-direction: column; gap: 4px; }
+.bit-label strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.bit-label span { font-size: 0.88rem; color: var(--text-tertiary); }
+
+/* status chip flips PENDING (amber) → OK (green) */
+.bit-status {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--caution);
+  color: var(--caution);
+  white-space: nowrap;
+  transition: color 400ms ease, border-color 400ms ease,
+              background 400ms ease, box-shadow 400ms ease;
+}
+.bit-status::before { content: 'PENDING'; }
+.bit-row.ok .bit-status {
+  color: var(--ink);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 20px -4px var(--accent-glow);
+}
+.bit-row.ok .bit-status::before { content: 'OK'; }
+
+/* final "ALL SYSTEMS GO" banner */
+.bit-final {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid var(--ink-line);
+  border-radius: 100px;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--text-tertiary);
+  transition: color 500ms ease, border-color 500ms ease, box-shadow 500ms ease;
+}
+.bit-final::before {
+  content: '';
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--text-tertiary);
+  transition: background 500ms ease, box-shadow 500ms ease;
+}
+.bit-final.go {
+  color: var(--accent);
+  border-color: color-mix(in oklch, var(--accent) 40%, var(--ink-line));
+  box-shadow: 0 0 40px -12px var(--accent-glow);
+}
+.bit-final.go::before { background: var(--accent); box-shadow: 0 0 12px var(--accent-glow); animation: enginePulse 2.4s ease-in-out infinite; }
+
+@media (max-width: 520px) {
+  .bit-row { grid-template-columns: 1fr; gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bit-final.go::before { animation: none; }
+}
+
+/* ============================================================
+   B12 · CLOSE — destination CTA + footer
+   The wire's final seat. Emotional close, then the footer.
+   ============================================================ */
+.close {
+  position: relative;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: clamp(80px, 16vh, 200px) clamp(20px, 4vw, 48px) clamp(72px, 12vh, 140px);
+  text-align: center;
+}
+/* short terminal wire dropping into the destination node */
+.close-wire {
+  position: absolute;
+  top: 0; left: 50%;
+  width: 2px; height: clamp(48px, 8vh, 100px);
+  transform: translateX(-50%);
+  background: linear-gradient(var(--ink-line), var(--accent));
+}
+.close-node {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: clamp(36px, 6vh, 60px);
+}
+.close-node .node-marker { --nm: 26px; }
+.close-folio {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.close h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(3rem, 8vw, 7rem);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+.close h2 em { display: block; font-style: italic; color: var(--accent); }
+.close-sub {
+  font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+  color: var(--text-secondary);
+  max-width: 40ch;
+  margin: 0 auto clamp(40px, 6vh, 56px);
+  line-height: 1.6;
+}
+.close .btn-primary { font-size: 1.05rem; padding: 18px 40px; }
+.close-readout {
+  margin-top: clamp(32px, 5vh, 48px);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+}
+.close-readout::before {
+  content: '';
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* --- footer --- */
+.footer {
+  border-top: 1px solid var(--ink-line);
+  padding: 36px clamp(20px, 4vw, 48px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.footer-logo {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  letter-spacing: -0.02em;
+}
+.footer-copy { font-size: 0.82rem; color: var(--text-tertiary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .close-node .node-marker.is-lit::after { animation: none; }
+}
+</style>
+
+<!-- C3 · no-JS fallback: force the fully-lit static state so proof
+     content is legible and the wire reads as complete without scripts. -->
+<noscript><style>
+  .node-proof { opacity: 1 !important; transform: none !important; }
+  .chat-msg { opacity: 1 !important; transform: none !important; }
+  .node .node-marker { background: color-mix(in oklch, var(--accent) 22%, var(--ink-raised));
+    border-color: var(--accent); box-shadow: 0 0 22px -2px var(--accent-glow); }
+  .node .node-marker::before { background: var(--accent); opacity: 1; }
+  .crit.met .crit-check, .crit .crit-check { background: var(--accent); border-color: var(--accent); }
+  .crit .crit-check svg { stroke-dashoffset: 0; }
+  .thesis-statement .word { color: var(--text-primary); opacity: 1; }
+  .thesis-statement .word.emph { color: var(--accent); }
+  .bit-status::before { content: 'OK'; }
+  .bit-row .bit-status { color: var(--accent); border-color: color-mix(in oklch, var(--accent) 40%, transparent); }
+  .bit-final { color: var(--accent); border-color: color-mix(in oklch, var(--accent) 40%, var(--ink-line)); }
+  .chat-try, .chat-chips { display: none; }
+  .spine { display: none; }
+</style></noscript>
+</head>
+<body>
+
+<!-- A3  instrument-grid backdrop (decorative, fixed) -->
+<div class="backdrop" aria-hidden="true"></div>
+
+<!-- B1  nav -->
+<nav class="nav" id="nav">
+  <a href="#top" class="nav-logo" aria-label="Trigger — home">
+    <span class="nav-logo-mark" aria-hidden="true"></span>
+    <span class="nav-logo-word">Trigger</span>
+  </a>
+  <a href="#close" class="nav-cta">Book a demo</a>
+</nav>
+<!-- B2–B4  origin / PFD hero -->
+<header class="hero" id="top">
+
+  <!-- B3 HUD — mission clock + AUTOPILOT ENGAGED light -->
+  <div class="hero-hud">
+    <span class="hud-engaged">Autopilot engaged</span>
+    <span class="hud-clock" id="missionClock" aria-label="Mission clock, UTC">--:--:-- UTC</span>
+  </div>
+
+  <!-- B3 self-leveling artificial-horizon hairline -->
+  <div class="hero-horizon" aria-hidden="true"></div>
+
+  <div class="hero-copy">
+    <p class="hero-eyebrow microlabel">Autonomous revenue systems</p>
+    <h1>
+      <span class="line"><span class="line-inner">Your business</span></span>
+      <span class="line"><span class="line-inner"><em>on autopilot.</em></span></span>
+    </h1>
+    <p class="hero-sub">One lead, from first contact to closed deal — chat, qualify, follow up, close. <b>It ran the late shift while you slept.</b></p>
+    <div class="hero-cta">
+      <a href="#pipeline" class="btn-primary">
+        Release the lead
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M17 7H8M17 7v9"/></svg>
+      </a>
+      <a href="#pipeline" class="btn-ghost">
+        See it run
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- B4 origin node — the wire's entry seat. data-node=0 anchors the spine top. -->
+  <div class="origin" data-node="0" id="origin">
+    <span class="node-marker" aria-hidden="true"></span>
+    <span class="origin-label">
+      <span class="folio">New lead · <b>inbound</b></span>
+      <span class="origin-readout mono">signal acquired — entering pipeline</span>
+    </span>
+  </div>
+</header>
+<!-- B5–B8  THE LIVING PIPELINE -->
+<section class="pipeline" id="pipeline">
+
+  <!-- global signal wire — C1 fills the paths from node centres -->
+  <svg class="spine" id="spine" aria-hidden="true" preserveAspectRatio="none">
+    <path class="spine-track" id="spineTrack" d=""></path>
+    <path class="spine-lit"   id="spineLit"   d=""></path>
+    <circle class="spine-pulse" id="spinePulse" r="6" cx="-99" cy="-99"></circle>
+  </svg>
+
+  <!-- NODE 01 · INQUIRY -->
+  <article class="node" data-node="1">
+    <div class="node-head">
+      <span class="node-marker" aria-hidden="true"></span>
+      <p class="node-folio">01 · Inquiry</p>
+      <h2 class="node-title">Every message, <em>answered</em> in seconds</h2>
+      <p class="node-desc">A lead lands at 11:43pm. The chatbot reads intent, answers instantly, and never lets the thread go cold. Try it — ask anything.</p>
+    </div>
+
+    <div class="node-proof" data-proof="inquiry">
+      <div class="proof-head">
+        <span class="microlabel">Live chat</span>
+        <span class="proof-stat mono">resolving</span>
+      </div>
+      <div class="chat-log">
+        <div class="chat-msg chat-out">Do you take bookings for 12 this Friday?</div>
+        <div class="chat-msg chat-in">We do — Friday 7pm seats 12 comfortably. Want me to hold the table?</div>
+        <div class="chat-msg chat-out">Yes please, under Priya.</div>
+      </div>
+      <form class="chat-try" id="chatTry" autocomplete="off">
+        <input type="text" id="chatInput" aria-label="Ask the chatbot a question" placeholder="Ask a question…">
+        <button type="submit">Ask</button>
+      </form>
+      <div class="chat-chips" id="chatChips">
+        <button type="button" class="chat-chip">Do you deliver?</button>
+        <button type="button" class="chat-chip">What are your hours?</button>
+        <button type="button" class="chat-chip">Can I get a quote?</button>
+      </div>
+    </div>
+  </article>
+
+  <!-- NODE 02 · QUALIFY -->
+  <article class="node" data-node="2">
+    <div class="node-head">
+      <span class="node-marker" aria-hidden="true"></span>
+      <p class="node-folio">02 · Qualify</p>
+      <h2 class="node-title">Sorted by <em>fit</em>, before you wake</h2>
+      <p class="node-desc">Budget, timeline, intent — checked against your rules the moment the lead lands. Ready ones rise to the top; the rest keep warming.</p>
+    </div>
+
+    <div class="node-proof" data-proof="qualify">
+      <div class="proof-head">
+        <span class="microlabel">Lead scoring</span>
+        <span class="proof-stat mono">evaluating</span>
+      </div>
+      <div class="qualify-grid" id="qualifyGrid">
+        <div class="crit" data-crit>
+          <span class="crit-check"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg></span>
+          Budget confirmed — over threshold
+        </div>
+        <div class="crit" data-crit>
+          <span class="crit-check"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg></span>
+          Timeline — wants to start this month
+        </div>
+        <div class="crit" data-crit>
+          <span class="crit-check"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg></span>
+          Decision-maker — yes, it's the owner
+        </div>
+        <div class="crit" data-crit>
+          <span class="crit-check"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg></span>
+          In service area — 4mi from you
+        </div>
+      </div>
+      <div class="qualify-score">
+        <span class="score-num mono" id="qualifyScore" data-target="92">0</span>
+        <span class="score-label">fit score</span>
+        <span class="qualify-verdict mono">QUALIFIED</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- NODE 03 · FOLLOW-UP -->
+  <article class="node" data-node="3">
+    <div class="node-head">
+      <span class="node-marker" aria-hidden="true"></span>
+      <p class="node-folio">03 · Follow-up</p>
+      <h2 class="node-title">It <em>chases</em> so you never have to</h2>
+      <p class="node-desc">A booked lead is a started sequence. Confirmation, a nudge, a reminder — sent on schedule, in your voice, until they show up.</p>
+    </div>
+
+    <div class="node-proof" data-proof="followup">
+      <div class="proof-head">
+        <span class="microlabel">Outreach sequence</span>
+        <span class="proof-stat mono">sending</span>
+      </div>
+      <div class="seq" id="seq">
+        <div class="seq-step" data-step>
+          <span class="seq-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
+          <span class="seq-body"><strong>Confirmation email</strong><span>Booking details + calendar invite</span></span>
+          <span class="seq-status mono">queued</span>
+        </div>
+        <div class="seq-step" data-step>
+          <span class="seq-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg></span>
+          <span class="seq-body"><strong>SMS nudge</strong><span>Sent 24h before — “See you Friday?”</span></span>
+          <span class="seq-status mono">queued</span>
+        </div>
+        <div class="seq-step" data-step>
+          <span class="seq-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M12 2h0M9 2h6"/></svg></span>
+          <span class="seq-body"><strong>Morning reminder</strong><span>2h before, with directions</span></span>
+          <span class="seq-status mono">queued</span>
+        </div>
+      </div>
+    </div>
+  </article>
+  <!-- NODE 04 · CLOSE (destination) -->
+  <article class="node" data-node="4">
+    <div class="node-head">
+      <span class="node-marker" aria-hidden="true"></span>
+      <p class="node-folio">04 · Close</p>
+      <h2 class="node-title">Closed — while the lights were <em>off</em></h2>
+      <p class="node-desc">Confirmed, paid, logged. You read about it over coffee. One lead, first contact to closed deal, and no human ever touched it.</p>
+    </div>
+
+    <div class="node-proof" data-proof="close">
+      <div class="proof-head">
+        <span class="microlabel">Deal record</span>
+        <span class="proof-stat mono">closing</span>
+      </div>
+      <div class="deal">
+        <div class="deal-value">$<span class="mono" id="dealValue" data-target="4200">0</span></div>
+        <div class="deal-meta">
+          <span><b>Table for 12</b> · Fri 7pm</span>
+          <span>Deposit <b>paid</b></span>
+        </div>
+        <span class="deal-status mono" id="dealStatus">PENDING</span>
+      </div>
+    </div>
+  </article>
+</section>
+<!-- B9  TELEMETRY READOUT STRIP -->
+<section class="telemetry" aria-label="Live system telemetry">
+  <div class="telemetry-inner">
+    <div class="telemetry-item">
+      <span class="telemetry-value mono" id="telLeads" data-target="1284">0</span>
+      <span class="telemetry-label">Leads processed</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-value" data-target="4.2" data-decimals="1">0<span class="unit">s</span></span>
+      <span class="telemetry-label">Avg response</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-value" data-target="93">0<span class="unit">%</span></span>
+      <span class="telemetry-label">Auto-resolved</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-value mono">0</span>
+      <span class="telemetry-label">Missed leads</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-value" data-target="22">0<span class="unit">h</span></span>
+      <span class="telemetry-label">Saved / week</span>
+    </div>
+  </div>
+</section>
+<!-- B10  THESIS -->
+<section class="thesis" id="thesis" aria-label="The point">
+  <div class="thesis-wire" id="thesisWire" aria-hidden="true"></div>
+  <p class="thesis-statement" id="thesisStatement">
+    <span class="word">Systems</span> <span class="word">that</span> <span class="word">run</span>
+    <span class="word emph">without</span> <span class="word emph">you</span> —
+    <span class="word">so</span> <span class="word">the</span> <span class="word">work</span>
+    <span class="word">still</span> <span class="word">gets</span> <span class="word">done</span>
+    <span class="word emph">while</span> <span class="word emph">you</span> <span class="word emph">sleep.</span>
+  </p>
+  <p class="thesis-coda mono">One lead · first contact → closed · <b>you were asleep</b></p>
+</section>
+<!-- B11 PRE-FLIGHT — live in days -->
+<section class="preflight" id="preflight" aria-label="Onboarding — live in days">
+  <div class="preflight-head">
+    <span class="microlabel">Pre-flight check</span>
+    <h2>Wired in, and <em>live in days</em></h2>
+  </div>
+  <div class="bit" id="bit">
+    <div class="bit-row" data-bit>
+      <div class="bit-label">
+        <strong>Map your workflow</strong>
+        <span>We trace how a lead moves through your business today.</span>
+      </div>
+      <span class="bit-status mono" aria-live="polite"></span>
+    </div>
+    <div class="bit-row" data-bit>
+      <div class="bit-label">
+        <strong>Build &amp; connect</strong>
+        <span>Chat, voice, and CRM wired to the tools you already run.</span>
+      </div>
+      <span class="bit-status mono" aria-live="polite"></span>
+    </div>
+    <div class="bit-row" data-bit>
+      <div class="bit-label">
+        <strong>Go live</strong>
+        <span>Autopilot engaged. The system starts handling leads.</span>
+      </div>
+      <span class="bit-status mono" aria-live="polite"></span>
+    </div>
+  </div>
+  <div class="bit-final" id="bitFinal">All systems go</div>
+</section>
+<!-- B12  CLOSE — destination CTA -->
+<section class="close" id="close" aria-label="Get started">
+  <div class="close-wire" aria-hidden="true"></div>
+  <div class="close-node">
+    <span class="node-marker is-lit" aria-hidden="true"></span>
+    <span class="close-folio">04 · Close · signal complete</span>
+  </div>
+  <h2>Clock out.<em>It's covered.</em></h2>
+  <p class="close-sub">Put one lead on autopilot and watch it close itself. We'll have your first system live in days, not months.</p>
+  <a href="#" class="btn-primary">
+    Book a demo
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M17 7H8M17 7v9"/></svg>
+  </a>
+  <p class="close-readout">signal complete — 1 lead → closed, 0 humans touched</p>
+</section>
+
+<!-- footer -->
+<footer class="footer">
+  <span class="footer-logo">Trigger</span>
+  <span class="footer-copy">© 2026 Trigger. Your business, on autopilot.</span>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  // The scroll-pulse narrative (reveals, node proofs, count-ups, thesis
+  // lighting) is the core of the page, so it plays for everyone. Only the
+  // perpetual idle loops (throbbing dots, glow pulses) honour reduce-motion,
+  // and those are handled in CSS media queries — not here.
+  var reduceMotion = false;
+
+  /* ==========================================================
+     C1 · GLOBAL SPINE GEOMETRY
+     One SVG wire threading the four in-pipeline node markers.
+     No viewBox → SVG user units map 1:1 to CSS px, so we can
+     feed marker centres straight in. Recomputed per layout.
+     ========================================================== */
+  var spine      = document.getElementById('spine');
+  var spineTrack = document.getElementById('spineTrack');
+  var spineLit   = document.getElementById('spineLit');
+  var spinePulse = document.getElementById('spinePulse');
+  var pipeline   = document.getElementById('pipeline');
+
+  var spineLen = 0;          // total path length (px) — shared with C2
+  var spinePoints = [];      // marker centres, for node-activation thresholds
+
+  function markerCentre(node, svgRect) {
+    var m = node.querySelector('.node-marker');
+    var r = (m || node).getBoundingClientRect();
+    return {
+      x: r.left - svgRect.left + r.width / 2,
+      y: r.top  - svgRect.top  + r.height / 2,
+      node: node
+    };
+  }
+
+  function buildPath(pts, straight) {
+    if (!pts.length) return '';
+    var d = 'M ' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1);
+    if (straight) {
+      // dead-simple vertical wire (<=720px: all markers share one column)
+      for (var s = 1; s < pts.length; s++) {
+        d += ' L ' + pts[s].x.toFixed(1) + ' ' + pts[s].y.toFixed(1);
+      }
+      return d;
+    }
+    // smooth vertical-biased cubic between consecutive markers — a hanging cable
+    for (var i = 1; i < pts.length; i++) {
+      var a = pts[i - 1], b = pts[i];
+      var midY = (a.y + b.y) / 2;
+      d += ' C ' + a.x.toFixed(1) + ' ' + midY.toFixed(1) +
+           ', '  + b.x.toFixed(1) + ' ' + midY.toFixed(1) +
+           ', '  + b.x.toFixed(1) + ' ' + b.y.toFixed(1);
+    }
+    return d;
+  }
+
+  function computeSpine() {
+    if (!spine || !pipeline) return;
+    var svgRect = spine.getBoundingClientRect();
+    var nodes = pipeline.querySelectorAll('.node[data-node]');
+    var pts = [];
+    for (var i = 0; i < nodes.length; i++) pts.push(markerCentre(nodes[i], svgRect));
+    if (pts.length < 2) return;
+
+    var straight = window.innerWidth <= 720;
+    var d = buildPath(pts, straight);
+
+    spineTrack.setAttribute('d', d);
+    spineLit.setAttribute('d', d);
+
+    spineLen = spineLit.getTotalLength();
+    spinePoints = pts;
+
+    // lit path hidden behind the pulse until C2 advances it
+    spineLit.style.strokeDasharray  = spineLen;
+    spineLit.style.strokeDashoffset = spineLen;
+
+    // expose to C2
+    window.__spine = {
+      path: spineLit, len: spineLen, points: pts,
+      pulse: spinePulse, track: spineTrack, svg: spine, pipeline: pipeline
+    };
+
+    if (typeof window.__onSpineReady === 'function') window.__onSpineReady();
+  }
+
+  var resizeRAF = null;
+  function onResize() {
+    if (resizeRAF) cancelAnimationFrame(resizeRAF);
+    resizeRAF = requestAnimationFrame(computeSpine);
+  }
+
+  // fonts can shift node heights; recompute once they settle
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(computeSpine);
+  }
+  window.addEventListener('load', computeSpine);
+  window.addEventListener('resize', onResize);
+  computeSpine();
+
+  // expose recompute for C2/C3
+  window.__computeSpine = computeSpine;
+  window.__reduceMotion = reduceMotion;
+
+  /* ==========================================================
+     C2 · MISSION CLOCK
+     Live UTC readout in the hero HUD. Ticks once a second —
+     a clock is information, not decoration, so it runs even
+     under reduced motion (no easing, just the current time).
+     ========================================================== */
+  var clockEl = document.getElementById('missionClock');
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function tickClock() {
+    if (!clockEl) return;
+    var d = new Date();
+    clockEl.textContent = pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) +
+                          ':' + pad(d.getUTCSeconds()) + ' UTC';
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ==========================================================
+     C2 · COUNT-UP HELPER
+     Eased odometer from 0 → data-target. Honours data-decimals.
+     Snaps instantly under reduced motion. Runs once per element.
+     ========================================================== */
+  function countUp(el, done) {
+    var target   = parseFloat(el.getAttribute('data-target'));
+    var decimals = parseInt(el.getAttribute('data-decimals') || '0', 10);
+    var unitEl   = el.querySelector('.unit');
+    var unit     = unitEl ? unitEl.outerHTML : '';
+    function render(v) { el.innerHTML = v.toFixed(decimals) + unit; }
+    if (reduceMotion) { render(target); if (done) done(); return; }
+    var dur = 1400, start = null;
+    function frame(ts) {
+      if (start === null) start = ts;
+      var p = Math.min((ts - start) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);          // ease-out cubic
+      render(target * eased);
+      if (p < 1) requestAnimationFrame(frame);
+      else if (done) done();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ==========================================================
+     C2 · NODE-PROOF ONE-SHOTS
+     Each proof plays exactly once, when its node goes active.
+     ========================================================== */
+  var proofsPlayed = {};
+  function playProof(node) {
+    var proof = node.querySelector('[data-proof]');
+    if (!proof) return;
+    var kind = proof.getAttribute('data-proof');
+    if (proofsPlayed[kind]) return;
+    proofsPlayed[kind] = true;
+
+    if (kind === 'qualify') {
+      var crits = proof.querySelectorAll('[data-crit]');
+      crits.forEach(function (c, i) {
+        setTimeout(function () { c.classList.add('met'); },
+                   reduceMotion ? 0 : 260 * (i + 1));
+      });
+      var score = proof.querySelector('#qualifyScore');
+      if (score) setTimeout(function () { countUp(score); },
+                            reduceMotion ? 0 : 260 * (crits.length + 1));
+    } else if (kind === 'followup') {
+      var steps = proof.querySelectorAll('[data-step]');
+      steps.forEach(function (s, i) {
+        var status = s.querySelector('.seq-status');
+        if (reduceMotion) { s.classList.add('sent'); if (status) status.textContent = 'sent'; return; }
+        setTimeout(function () { s.classList.add('pending'); if (status) status.textContent = 'sending'; }, 500 * i);
+        setTimeout(function () {
+          s.classList.remove('pending'); s.classList.add('sent');
+          if (status) status.textContent = 'sent';
+        }, 500 * i + 420);
+      });
+    } else if (kind === 'close') {
+      var dv = proof.querySelector('#dealValue');
+      var ds = proof.querySelector('#dealStatus');
+      if (dv) countUp(dv, function () { if (ds) ds.textContent = 'WON'; });
+      else if (ds) ds.textContent = 'WON';
+    }
+    // 'inquiry' plays via pure CSS (chat bubbles reveal on .is-active)
+  }
+
+  /* ==========================================================
+     C2 · SCROLL-LINKED SIGNAL PULSE
+     One rAF tick (scroll/resize-driven) maps scroll progress
+     to a point on the spine. Lit segment trails the pulse;
+     nodes activate as the pulse passes their length fraction.
+     ========================================================== */
+  var nodeFracs = [];    // { node, frac } per pipeline node, by path length
+  function sampleNodeFractions() {
+    if (!window.__spine || !window.__spine.len) return;
+    var s = window.__spine, len = s.len, path = s.path;
+    var SAMPLES = 320, samples = [];
+    for (var i = 0; i <= SAMPLES; i++) {
+      var l = (i / SAMPLES) * len;
+      var pt = path.getPointAtLength(l);
+      samples.push({ l: l, x: pt.x, y: pt.y });
+    }
+    nodeFracs = s.points.map(function (p) {
+      var best = 0, bestD = Infinity;
+      for (var j = 0; j < samples.length; j++) {
+        var dx = samples[j].x - p.x, dy = samples[j].y - p.y;
+        var dist = dx * dx + dy * dy;
+        if (dist < bestD) { bestD = dist; best = samples[j].l; }
+      }
+      return { node: p.node, frac: len ? best / len : 0 };
+    });
+  }
+
+  var telLeads = document.getElementById('telLeads');
+  var telLeadsBase = telLeads ? parseInt(telLeads.getAttribute('data-target'), 10) : 0;
+  var telemetryCounted = false;
+
+  function setPulse(progress) {
+    var s = window.__spine;
+    if (!s || !s.len) return;
+    var len = s.len;
+    var lenAt = progress * len;
+    // lit trail behind the pulse
+    s.path.style.strokeDashoffset = (len - lenAt).toFixed(1);
+    // pulse bead position
+    if (progress <= 0) { s.pulse.setAttribute('cx', -99); s.pulse.setAttribute('cy', -99); }
+    else {
+      var pt = s.path.getPointAtLength(lenAt);
+      s.pulse.setAttribute('cx', pt.x.toFixed(1));
+      s.pulse.setAttribute('cy', pt.y.toFixed(1));
+    }
+    // activate each node when its OWN marker crosses the viewport centre,
+    // independent of the pulse's path-fraction — keeps proofs firing in the
+    // middle of the screen rather than skewing late with the pipeline padding.
+    var mid = window.innerHeight * 0.5;
+    for (var i = 0; i < nodeFracs.length; i++) {
+      var node = nodeFracs[i].node;
+      if (node.classList.contains('is-active')) continue;
+      var marker = node.querySelector('.node-marker') || node;
+      if (marker.getBoundingClientRect().top <= mid) {
+        node.classList.add('is-active');
+        playProof(node);
+      }
+    }
+    // leads counter creeps forward in lockstep with the pulse
+    if (telLeads && telemetryCounted) {
+      telLeads.textContent = Math.round(telLeadsBase + progress * 42).toLocaleString();
+    }
+  }
+
+  function pipelineProgress() {
+    var s = window.__spine;
+    if (!s) return 0;
+    var rect = s.pipeline.getBoundingClientRect();
+    var vh = window.innerHeight;
+    // 0 when pipeline top hits mid-viewport, 1 when bottom hits mid-viewport
+    var span = rect.height;
+    var scrolled = (vh * 0.5) - rect.top;
+    return Math.max(0, Math.min(1, scrolled / span));
+  }
+
+  var ticking = false;
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () {
+      // under reduced motion everything is already seated lit (activateAll);
+      // don't let the scroll-driven pulse un-light the wire.
+      if (!reduceMotion) setPulse(pipelineProgress());
+      updateThesis();
+      updateNav();
+      ticking = false;
+    });
+  }
+
+  /* ==========================================================
+     C2 · THESIS WORD LIGHTING
+     Words light in sequence as the statement crosses the
+     viewport centre. Emphasis words go green; the rest brighten.
+     ========================================================== */
+  var thesisEl = document.getElementById('thesisStatement');
+  var thesisWire = document.getElementById('thesisWire');
+  var thesisWords = thesisEl ? thesisEl.querySelectorAll('.word') : [];
+  function updateThesis() {
+    if (!thesisEl || !thesisWords.length || reduceMotion) return;
+    var rect = thesisEl.getBoundingClientRect();
+    var vh = window.innerHeight;
+    var p = (vh * 0.85 - rect.top) / (rect.height + vh * 0.25);
+    p = Math.max(0, Math.min(1, p));
+    var lit = Math.round(p * thesisWords.length);
+    thesisWords.forEach(function (w, i) {
+      if (i < lit) w.classList.add(w.classList.contains('emph') ? 'lit' : 'on');
+      else w.classList.remove('lit', 'on');
+    });
+    // drive the wire fill + pulse bead down through the statement
+    if (thesisWire) {
+      thesisWire.style.setProperty('--thesis-fill', (p * 100).toFixed(1) + '%');
+      thesisWire.style.setProperty('--thesis-pulse-op', p > 0.02 && p < 0.98 ? '1' : '0');
+    }
+  }
+
+  /* ==========================================================
+     C2 · NAV SCROLL STATE
+     ========================================================== */
+  var nav = document.getElementById('nav');
+  function updateNav() {
+    if (nav) nav.classList.toggle('is-scrolled', window.pageYOffset > 40);
+  }
+
+  /* ==========================================================
+     C2 · TYPED CHAT INTERACTION (the one hands-on graft)
+     Type a question (or tap a chip) → a canned reply streams
+     in word-by-word and the lead hands onto the wire. Keyboard
+     operable; resolves instantly under reduced motion.
+     ========================================================== */
+  var chatTry   = document.getElementById('chatTry');
+  var chatInput = document.getElementById('chatInput');
+  var chatChips = document.getElementById('chatChips');
+  var chatLog   = chatTry ? chatTry.closest('.node-proof').querySelector('.chat-log') : null;
+  var chatBusy  = false;
+
+  function cannedReply(q) {
+    q = (q || '').toLowerCase();
+    if (/deliver|ship/.test(q))        return "Yes — same-day within 10 miles, and I can start an order for you now.";
+    if (/hour|open|close/.test(q))     return "We're open 9am–9pm, seven days. Want me to book you a slot?";
+    if (/quote|price|cost|much/.test(q)) return "Happy to — tell me the size and date and I'll price it instantly.";
+    if (/book|table|reserv/.test(q))   return "I can hold that now — what name and time should I put it under?";
+    return "Got it — I've logged that and a specialist will confirm within the hour. Anything else?";
+  }
+
+  function streamReply(text) {
+    if (!chatLog) return;
+    var out = document.createElement('div');
+    out.className = 'chat-msg chat-in';
+    chatLog.appendChild(out);
+    // reveal the freshly-added bubble (bypasses the .is-active-gated CSS)
+    out.style.opacity = '1'; out.style.transform = 'none';
+    if (reduceMotion) { out.textContent = text; chatBusy = false; return; }
+    var words = text.split(' '), idx = 0;
+    out.classList.add('streaming');
+    (function next() {
+      if (idx >= words.length) { out.classList.remove('streaming'); chatBusy = false; return; }
+      out.textContent += (idx ? ' ' : '') + words[idx++];
+      chatLog.scrollTop = chatLog.scrollHeight;
+      setTimeout(next, 55);
+    })();
+  }
+
+  function askChat(q) {
+    if (chatBusy || !chatLog || !q) return;
+    chatBusy = true;
+    var mine = document.createElement('div');
+    mine.className = 'chat-msg chat-out';
+    mine.textContent = q;
+    mine.style.opacity = '1'; mine.style.transform = 'none';
+    chatLog.appendChild(mine);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    setTimeout(function () { streamReply(cannedReply(q)); }, reduceMotion ? 0 : 400);
+  }
+
+  if (chatTry) {
+    chatTry.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var q = chatInput.value.trim();
+      if (!q) return;
+      chatInput.value = '';
+      askChat(q);
+    });
+  }
+  if (chatChips) {
+    chatChips.addEventListener('click', function (e) {
+      var chip = e.target.closest('.chat-chip');
+      if (chip) askChat(chip.textContent.trim());
+    });
+  }
+
+  /* ==========================================================
+     C2 · TELEMETRY + PRE-FLIGHT (IntersectionObserver one-shots)
+     ========================================================== */
+  function onView(el, cb, threshold) {
+    if (!el) return;
+    if (!('IntersectionObserver' in window)) { cb(); return; }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { cb(); io.disconnect(); }
+      });
+    }, { threshold: threshold || 0.4 });
+    io.observe(el);
+  }
+
+  // telemetry odometers
+  var telStrip = document.querySelector('.telemetry');
+  onView(telStrip, function () {
+    telemetryCounted = true;
+    document.querySelectorAll('.telemetry-value[data-target]').forEach(function (el) { countUp(el); });
+  }, 0.3);
+
+  // pre-flight built-in-test cascade
+  var bit = document.getElementById('bit');
+  var bitFinal = document.getElementById('bitFinal');
+  onView(document.getElementById('preflight'), function () {
+    var rows = bit ? bit.querySelectorAll('[data-bit]') : [];
+    rows.forEach(function (row, i) {
+      setTimeout(function () { row.classList.add('ok'); },
+                 reduceMotion ? 0 : 480 * (i + 1));
+    });
+    setTimeout(function () { if (bitFinal) bitFinal.classList.add('go'); },
+               reduceMotion ? 0 : 480 * (rows.length + 1));
+  }, 0.35);
+
+  /* ==========================================================
+     C2/C3 · WIRE-UP + REDUCED-MOTION / NO-SPINE FALLBACK
+     ========================================================== */
+  function activateAll() {
+    // seat pulse at the end, light the whole wire, fire every proof
+    if (window.__spine && window.__spine.len) {
+      window.__spine.path.style.strokeDashoffset = 0;
+    }
+    document.querySelectorAll('.node[data-node]').forEach(function (n) {
+      n.classList.add('is-active'); playProof(n);
+    });
+    thesisWords.forEach(function (w) { w.classList.add(w.classList.contains('emph') ? 'lit' : 'on'); });
+  }
+
+  window.__onSpineReady = function () {
+    sampleNodeFractions();
+    if (reduceMotion) { activateAll(); return; }
+    setPulse(pipelineProgress());
+  };
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', function () {
+    // spine recompute (C1) fires its own handler; re-sample after it settles
+    requestAnimationFrame(function () { sampleNodeFractions(); onScroll(); });
+  });
+
+  // initial paint (covers the case where spine was ready before this ran)
+  if (window.__spine && window.__spine.len) { window.__onSpineReady(); }
+  updateNav();
+})();
+</script>
+</body>
+</html>
